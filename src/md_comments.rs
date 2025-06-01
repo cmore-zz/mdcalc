@@ -71,27 +71,38 @@ pub fn parse_markdown_for_comments<'a>(
     let mut results = Vec::new();
 
     for node in root.descendants() {
-        match &node.data.borrow().value {
-            NodeValue::HtmlInline(html) => {
-                results.extend(
-                    extract_html_comments(html)
-                        .into_iter()
-                        .map(|comment| LocatedHtmlComment { node, comment }),
-                );
-            }
-            NodeValue::HtmlBlock(block) => {
-                results.extend(
-                    extract_html_comments(&block.literal)
-                        .into_iter()
-                        .map(|comment| LocatedHtmlComment { node, comment }),
-                );
-            }
-            _ => {}
-        }
+        let data_ref = node.data.borrow();
+
+        let (raw, source_start) = match &data_ref.value {
+            NodeValue::HtmlInline(html) => (html.as_str(), data_ref.sourcepos.start),
+            NodeValue::HtmlBlock(block) => (block.literal.as_str(), data_ref.sourcepos.start),
+            _ => continue,
+        };
+
+        let offset_line = source_start.line.saturating_sub(1);
+        let col = source_start.column.saturating_sub(1);
+
+        if let Some(line_start_offset) = markdown
+            .lines()
+            .take(offset_line)
+            .map(|l| l.len() + 1)
+            .sum::<usize>()
+            .checked_add(col)
+    {
+        results.extend(
+            extract_html_comments(raw)
+                .into_iter()
+                .map(|mut comment| {
+                    comment.offset += line_start_offset;
+                    LocatedHtmlComment { node, comment }
+                }),
+        );
+    }
     }
 
     results
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -119,5 +130,6 @@ mod tests {
         assert_eq!(result.len(), 2);
     }
 }
+
 
 

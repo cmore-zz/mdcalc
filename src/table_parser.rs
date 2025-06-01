@@ -2,26 +2,29 @@
 
 use comrak::{nodes::{AstNode, NodeValue}, Arena};
 
-use crate::comment_stripper::strip_comments_from_line;
-use crate::md_comments::HtmlComment;
+use crate::comment_stripper::{strip_comments_from_line, strip_comments_from_line_with_comments, CommentStrippedLine};
+use crate::md_comments::{HtmlComment, LocatedHtmlComment};
 
-pub struct TableCell {
+pub struct TableCell<'a> {
     pub raw: String,
-    pub comments: Vec<HtmlComment>,
+    pub comments: Vec<LocatedHtmlComment<'a>>,
 }
 
-pub struct TableRow {
-    pub cells: Vec<TableCell>,
+pub struct TableRow<'a> {
+    pub cells: Vec<TableCell<'a>>,
 }
 
-pub struct MarkdownTable {
-    pub rows: Vec<TableRow>,
+pub struct MarkdownTable<'a> {
+    pub rows: Vec<TableRow<'a>>,
 }
 
 pub struct TableParser;
 
 impl TableParser {
-    pub fn extract_tables_from_ast<'a>(root: &'a AstNode<'a>) -> Vec<MarkdownTable> {
+    pub fn extract_tables_from_ast<'a>(
+        root: &'a AstNode<'a>,
+        comments: Option<&'a [LocatedHtmlComment<'a>]>,
+    ) -> Vec<MarkdownTable<'a>> {
         let mut tables = Vec::new();
 
         for node in root.descendants() {
@@ -29,7 +32,7 @@ impl TableParser {
                 if let Some(text) = Self::collect_literal_text(node) {
                     let lines: Vec<&str> = text.lines().filter(|l| l.starts_with('|')).collect();
                     if lines.len() >= 2 {
-                        let table = Self::parse_table_lines(&lines);
+                        let table = Self::parse_table_lines(&lines, comments);
                         tables.push(table);
                     }
                 }
@@ -62,14 +65,21 @@ impl TableParser {
         }
     }
 
-    fn parse_table_lines(lines: &[&str]) -> MarkdownTable {
+    fn parse_table_lines<'a>(
+        lines: &[&str],
+        comments: Option<&'a [LocatedHtmlComment<'a>]>,
+    ) -> MarkdownTable<'a> {
         let mut rows = Vec::new();
         for line in lines {
             if line.trim().is_empty() || line.contains("---") {
                 continue;
             }
 
-            let stripped = strip_comments_from_line(line);
+            let stripped: CommentStrippedLine<'a> = match comments {
+                Some(all_comments) => strip_comments_from_line_with_comments(line, all_comments),
+                None => strip_comments_from_line(line, 0, None),
+            };
+
             let mut cell_starts = Vec::new();
             let mut index = 0;
             for segment in stripped.stripped.trim().trim_matches('|').split('|') {
@@ -85,7 +95,7 @@ impl TableParser {
                 let comments = stripped
                     .comments
                     .iter()
-                    .filter(|c| c.offset >= cell_start && c.offset < cell_end)
+                    .filter(|c| c.comment.offset >= cell_start && c.comment.offset < cell_end)
                     .cloned()
                     .collect();
                 cells.push(TableCell {
@@ -97,5 +107,9 @@ impl TableParser {
         }
         MarkdownTable { rows }
     }
-}
+} 
+
+
+
+
 
