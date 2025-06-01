@@ -2,11 +2,18 @@
 
 use comrak::{nodes::{AstNode, NodeValue}, parse_document, Arena, ComrakOptions};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CommentKind {
+    Formula,    // starts with '=' after optional '!'
+    Marker,     // starts with '!'
+    Formatting, // starts with '$' or other
+    Unknown,    // fallback
+}
+
 #[derive(Debug,Clone)]
 pub struct HtmlComment {
     pub content: String,
-    pub is_formula: bool,
-    pub is_marker: bool,
+    pub kind: CommentKind,
     pub offset: usize,
     pub length: usize,
 }
@@ -29,11 +36,20 @@ pub fn extract_html_comments(html: &str) -> Vec<HtmlComment> {
             let full = &html[content_start..content_end];
             let trimmed = full.trim();
 
+            let kind = if trimmed.starts_with("!=") || trimmed.starts_with('=') {
+                CommentKind::Formula
+            } else if trimmed.starts_with('!') &&
+                    trimmed[1..].chars().all(|c| c.is_ascii_alphanumeric()) {
+                CommentKind::Marker
+            } else if trimmed.starts_with('%') {
+                CommentKind::Formatting
+            } else {
+                CommentKind::Unknown
+            };
+
             let comment = HtmlComment {
                 content: full.to_string(),
-                is_formula: trimmed.starts_with('='),
-                is_marker: trimmed.starts_with('!') &&
-                    trimmed[1..].chars().all(|c| c.is_ascii_alphanumeric()),
+                kind: kind,
                 offset: absolute_begin,
                 length: absolute_end - absolute_begin,
             };
@@ -87,8 +103,8 @@ mod tests {
         let input = "Here is <!-- !A --> and <!-- =B2*C2 --> inline.";
         let result = extract_html_comments(input);
         assert_eq!(result.len(), 2);
-        assert!(result[0].is_marker);
-        assert!(result[1].is_formula);
+        assert_eq!(CommentKind::Marker, result[0].kind);
+        assert_eq!(CommentKind::Formula, result[1].kind);
         println!("result[0].offset = {}", result[0].offset);
 
         assert_eq!(result[0].offset, 8);

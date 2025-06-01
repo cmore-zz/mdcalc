@@ -20,8 +20,9 @@ pub fn strip_comments_from_line(line: &str) -> CommentStrippedLine {
     sorted_comments.sort_by_key(|c| -(c.offset as isize));
 
     for comment in &sorted_comments {
+        let sanitized_content = comment.content.replace('|', "¦");
         // match the length of original
-        let placeholder = format!("/***{}**/", comment.content);
+        let placeholder = format!("/***{}**/", sanitized_content);
         stripped.replace_range(
             comment.offset..comment.offset + comment.length,
             &placeholder,
