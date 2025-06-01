@@ -2,9 +2,12 @@
 
 use comrak::{nodes::{AstNode, NodeValue}, Arena};
 
+use crate::comment_stripper::strip_comments_from_line;
+use crate::md_comments::HtmlComment;
+
 pub struct TableCell {
     pub raw: String,
-    pub comments: Vec<String>,
+    pub comments: Vec<HtmlComment>,
 }
 
 pub struct TableRow {
@@ -24,7 +27,7 @@ impl TableParser {
         for node in root.descendants() {
             if let NodeValue::Paragraph = &node.data.borrow().value {
                 if let Some(text) = Self::collect_literal_text(node) {
-                    let lines: Vec<&str> = text.lines().map(str::trim).filter(|l| l.starts_with('|')).collect();
+                    let lines: Vec<&str> = text.lines().filter(|l| l.starts_with('|')).collect();
                     if lines.len() >= 2 {
                         let table = Self::parse_table_lines(&lines);
                         tables.push(table);
@@ -65,16 +68,34 @@ impl TableParser {
             if line.trim().is_empty() || line.contains("---") {
                 continue;
             }
-            let raw_cells: Vec<&str> = line.trim().trim_matches('|').split('|').collect();
-            let cells = raw_cells
-                .into_iter()
-                .map(|cell| TableCell {
-                    raw: cell.trim().to_string(),
-                    comments: Vec::new(),
-                })
-                .collect();
+
+            let stripped = strip_comments_from_line(line);
+            let mut cell_starts = Vec::new();
+            let mut index = 0;
+            for segment in stripped.stripped.trim().trim_matches('|').split('|') {
+                cell_starts.push(index);
+                index += segment.len() + 1; // +1 for the '|' delimiter
+            }
+
+            let raw_cells: Vec<&str> = stripped.stripped.split('|').collect();
+            let mut cells = Vec::new();
+            for (i, raw) in raw_cells.iter().enumerate() {
+                let cell_start = cell_starts[i];
+                let cell_end = cell_start + raw.len();
+                let comments = stripped
+                    .comments
+                    .iter()
+                    .filter(|c| c.offset >= cell_start && c.offset < cell_end)
+                    .cloned()
+                    .collect();
+                cells.push(TableCell {
+                    raw: raw.to_string(),
+                    comments,
+                });
+            }
             rows.push(TableRow { cells });
         }
         MarkdownTable { rows }
     }
 }
+

@@ -2,7 +2,7 @@
 
 use comrak::{nodes::{AstNode, NodeValue}, parse_document, Arena, ComrakOptions};
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub struct HtmlComment {
     pub content: String,
     pub is_formula: bool,
@@ -11,7 +11,7 @@ pub struct HtmlComment {
     pub length: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub struct LocatedHtmlComment<'a> {
     pub node: &'a AstNode<'a>,
     pub comment: HtmlComment,
@@ -26,14 +26,14 @@ pub fn extract_html_comments(html: &str) -> Vec<HtmlComment> {
             let absolute_end = absolute_begin + end + 3;
             let content_start = absolute_begin + 4;
             let content_end = absolute_begin + end;
-            let full = &html[content_start..content_end].trim();
-            let trimmed = full.trim_start();
+            let full = &html[content_start..content_end];
+            let trimmed = full.trim();
 
             let comment = HtmlComment {
                 content: full.to_string(),
                 is_formula: trimmed.starts_with('='),
-                is_marker: trimmed.starts_with('!') && !full.starts_with("!=") &&
-                    full[1..].chars().all(|c| c.is_ascii_alphanumeric()),
+                is_marker: trimmed.starts_with('!') &&
+                    trimmed[1..].chars().all(|c| c.is_ascii_alphanumeric()),
                 offset: absolute_begin,
                 length: absolute_end - absolute_begin,
             };

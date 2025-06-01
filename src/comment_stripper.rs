@@ -20,7 +20,8 @@ pub fn strip_comments_from_line(line: &str) -> CommentStrippedLine {
     sorted_comments.sort_by_key(|c| -(c.offset as isize));
 
     for comment in &sorted_comments {
-        let placeholder = format!("/*{}*/", comment.content);
+        // match the length of original
+        let placeholder = format!("/***{}**/", comment.content);
         stripped.replace_range(
             comment.offset..comment.offset + comment.length,
             &placeholder,
@@ -40,10 +41,11 @@ mod tests {
 
     #[test]
     fn test_strip_and_replace() {
-        let input = "A <!-- !A --> | B <!-- !=B2*C2 --> | C";
+        let input = "A <!-- !A --> | B <!-- =B2*C2 --> | C";
         let result = strip_comments_from_line(input);
+        print!("comments: {:?}, stripped: {}", result.comments, result.stripped);
         assert_eq!(result.comments.len(), 2);
-        assert!(result.stripped.contains("/*!A*/"));
-        assert!(result.stripped.contains("/*!==B2*C2*/"));
+        assert!(result.stripped.contains("/*** !A **/"));
+        assert!(result.stripped.contains("/*** =B2*C2 **/"));
     }
 }

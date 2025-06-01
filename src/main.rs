@@ -1,6 +1,7 @@
 
 mod md_comments;
 mod table_parser;
+mod comment_stripper;
 
 use comrak::{parse_document, Arena, ComrakOptions};
 use comrak::nodes::{AstNode, NodeValue};
