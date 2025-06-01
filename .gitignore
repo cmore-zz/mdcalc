@@ -1,0 +1,14 @@
+/target/
+**/*.rs.bk
+*.swp
+*.swo
+.DS_Store
+#* 
+.#*
+*.log
+*.tmp
+
+# Editor/IDE
+.vscode/
+.idea/
+*.code-workspace
