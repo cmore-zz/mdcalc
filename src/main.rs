@@ -6,7 +6,7 @@ mod cell_markers;
 
 use std::env;
 use crate::md_comments::parse_markdown_for_comments;
-use crate::cell_markers::{apply_marker_mode, MarkerMode};
+use crate::cell_markers::{apply_marker_mode, make_html_comment_node, MarkerMode};
 use crate::table_parser::TableParser;
 
 use comrak::{parse_document, Arena, ComrakOptions};
@@ -61,14 +61,14 @@ fn check_table_parsing() {
 
     dump_ast(root, 2);
 
-    let tables = TableParser::extract_tables_from_ast(root, Some(&comments));
+    let tables = TableParser::extract_tables_from_ast(root, Some(&comments), markdown);
     println!("Found {} tables", tables.len());
 
     for (i, table) in tables.iter().enumerate() {
         println!("Table {}: {} rows", i + 1, table.rows.len());
         for row in &table.rows {
             for cell in &row.cells {
-                print!("[{}] ", cell.raw);
+                print!("[{}] ", cell.raw_text());
             }
             println!();
         }
@@ -103,16 +103,16 @@ fn main() {
     let comments = parse_markdown_for_comments(&arena, markdown);
     println!("comments: {:#?}", comments);
 
-    let mut tables = TableParser::extract_tables_from_ast(root, Some(&comments));
+    let mut tables = TableParser::extract_tables_from_ast(root, Some(&comments), markdown);
 
     println!("Found {} tables", tables.len());
 
     for (i, table) in tables.iter_mut().enumerate() {
         println!("Table {}: {} rows", i + 1, table.rows.len());
-        apply_marker_mode(table, mode);
+        apply_marker_mode(table, mode, make_html_comment_node(&arena));
         for row in &table.rows {
             for cell in &row.cells {
-                print!("[{}] ", cell.raw);
+                print!("[{}] ", cell.raw_text());
             }
             println!();
         }
